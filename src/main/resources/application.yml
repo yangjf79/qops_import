@@ -1,0 +1,42 @@
+server:
+  access-host: 127.0.0.1
+  port: 2082
+  
+spring:
+  mail:
+    #host: smtp.163.com
+    #username: nventadmin@163.com
+    #password: rfq0532
+    #default-encoding: UTF-8
+    #from: Admin<nventadmin@163.com>
+    host: 10.14.24.84
+    username: apps_@nVent.com
+    default-encoding: UTF-8
+    from: Order System Test<apps_@nVent.com>
+    sendTest: true
+    testTo: Ken.Mu@nVent.com
+
+  datasource:
+    url: jdbc:mysql://localhost/nvent?serverTimezone=Asia/Shanghai
+    username: root
+    password: 1qaz@WSX
+    hikari:      minimum-idle: 5
+      maximum-pool-size: 15
+      auto-commit: true
+      idle-timeout: 30000
+      pool-name: DatebookHikariCP
+      max-lifetime: 1800000
+      connection-timeout: 30000
+      connection-test-query: SELECT 1
+
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 100MB
+      max-request-size: 100MB
+
+  jackson:
+    default-property-inclusion: non_null
+
+excelImport:
+  cron: 0 05 7-22 * * ?
