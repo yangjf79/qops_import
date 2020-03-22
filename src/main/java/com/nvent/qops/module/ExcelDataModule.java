@@ -1,17 +1,19 @@
 package com.nvent.qops.module;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 import javax.annotation.PostConstruct;
 
-import org.assertj.core.util.Arrays;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
@@ -20,6 +22,10 @@ import com.nvent.qops.dao.ExcelDataDAO;
 import com.nvent.qops.entity.ExcelData;
 //import com.nvent.qops.so.module.ExcelSoModule;
 import com.nvent.util.ReadExcelUtils;
+
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.Response;
 
 @Service
 public class ExcelDataModule {
@@ -33,6 +39,9 @@ public class ExcelDataModule {
 	
 //	@Autowired
 //	private ExcelSoModule excelSoModule;
+	
+	@Value("${qopsURL:http://127.0.0.1:8080}")
+	private String qopsURL;
 	
 	@PostConstruct
 	private void init() {
@@ -78,16 +87,38 @@ public class ExcelDataModule {
 			//log.info(excel.getNickname());
 			//1. 导入外部表格数据
 			doExcelImport(excel);
-			/*
+			
 			//2. eco 导入完成后，匹配 ECO_No
 			if(excel.getNickname().equals("eco")) {
-				excelEcoModule.saveEcoToRfqDetailAndCreatEco();
+				//excelEcoModule.saveEcoToRfqDetailAndCreatEco();
+				try {
+					OkHttpClient client = new OkHttpClient();
+
+					Request request = new Request.Builder()
+							.url(qopsURL + "/api/eco/saveEcoToRfqDetailAndCreatEco")
+							.get().addHeader("cache-control", "no-cache").build();
+
+					Response response = client.newCall(request).execute();
+				} catch (IOException e) {
+					log.error("saveEcoToRfqDetailAndCreatEco error", e);
+				}
 			}
 			//3. so 导入完成后，匹配 SO_NO
 			if(excel.getNickname().equals("so")) {
-				excelSoModule.addSoNoToEco();
+				//excelSoModule.addSoNoToEco();
+				try {
+					OkHttpClient client = new OkHttpClient();
+
+					Request request = new Request.Builder()
+							.url(qopsURL + "/api/so/addSoNoToEco")
+							.get().addHeader("cache-control", "no-cache").build();
+
+					Response response = client.newCall(request).execute();
+				} catch (IOException e) {
+					log.error("saveEcoToRfqDetailAndCreatEco error", e);
+				}
 			}
-			*/
+			
 		}
 
 		log.info("End of execute excel import.");
