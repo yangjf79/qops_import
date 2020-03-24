@@ -157,4 +157,12 @@ public class ReadExcelUtils {
 		}
 		return cellvalue;
 	}
+	
+	public void close() {
+		try {
+			wb.close();
+		} catch (IOException e) {
+			log.error("close excel error", e);
+		}
+	}
 }

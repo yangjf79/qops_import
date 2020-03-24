@@ -2,6 +2,7 @@ package com.nvent.qops.module;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -20,14 +21,18 @@ import org.springframework.stereotype.Service;
 import com.nvent.qops.dao.ExcelDataDAO;
 //import com.nvent.qops.eco.module.ExcelEcoModule;
 import com.nvent.qops.entity.ExcelData;
+import com.nvent.util.FileUtils;
 //import com.nvent.qops.so.module.ExcelSoModule;
 import com.nvent.util.ReadExcelUtils;
 
+import jcifs.smb.NtlmPasswordAuthentication;
+import jcifs.smb.SmbFile;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
 
 @Service
+@SuppressWarnings("rawtypes")
 public class ExcelDataModule {
 	public static final Logger log = LoggerFactory.getLogger(ExcelDataModule.class);
 
@@ -42,11 +47,24 @@ public class ExcelDataModule {
 	
 	@Value("${qopsURL:http://127.0.0.1:8080}")
 	private String qopsURL;
+
+	@Value("${excelImport.domain:nventco}")
+	private String domain;
+
+	@Value("${excelImport.account:E1121001}")
+	private String account;
+	
+	@Value("${excelImport.password:pentair12@}")
+	private String password;
+	
+	@Value("${excelImport.tmpPath:d:/nvent_import_server/tmp}")
+	private String tmpPath;
 	
 	@PostConstruct
 	private void init() {
 		//清理 excel_eco 表中的重复数据
 		clearDuplicateRecordsInExcelEco();
+		new File(tmpPath).mkdirs();
 	}
 	
 	public List<ExcelData> getAllExcelData() {
@@ -71,22 +89,19 @@ public class ExcelDataModule {
 		return true;
 	}
 	
-	//Import excel data to mySql by manual
-	public void excelImportManual(ExcelData excelData) {
-		doExcelImport(excelData);
-	}
-	
 	@Scheduled(cron = "${excelImport.cron}")
 	public void excelImportTask() {
 		log.info("Begin to execute excel import.");
 
 		// 遍历并导入Excel文件
 		List<ExcelData> excels = excelDataDAO.getAllExcelData();
+		
+		NtlmPasswordAuthentication auth = new NtlmPasswordAuthentication(domain, account, password);
 
 		for (ExcelData excel : excels) {
 			//log.info(excel.getNickname());
 			//1. 导入外部表格数据
-			doExcelImport(excel);
+			doExcelImport(excel, auth);
 			
 			//2. eco 导入完成后，匹配 ECO_No
 			if(excel.getNickname().equals("eco")) {
@@ -124,19 +139,30 @@ public class ExcelDataModule {
 		log.info("End of execute excel import.");
 	}
 
-	@SuppressWarnings("rawtypes")
-	private void doExcelImport(ExcelData excelData) {
+	private void doExcelImport(ExcelData excelData, NtlmPasswordAuthentication auth) {
 		try {
 			// 1. 查找文件是否存在
-			String filePath = excelData.getExcelLocation() + File.separator + excelData.getExcelName();
-			if (!new File(filePath).exists()) {
+			String tmpFilePath = null;
+			String fileName = excelData.getExcelName();
+			String filePath = excelData.getExcelLocation() + File.separator + fileName;
+			filePath = filePath.replaceAll("\\\\", "/");
+			filePath = "smb:" + filePath;
+			SmbFile file = new SmbFile(filePath, auth);
+			if (!file.exists()) {
 				log.error("Didn't find this Excel File: {} - Skipped!", filePath);
 				return;
+			} else {
+				//文件copy到本地，读取后删除
+				tmpFilePath = tmpPath + "/" + fileName;
+				InputStream is = file.getInputStream();
+				FileUtils.transFile(is, tmpFilePath);
+				is.close();
+				log.info("Copied file from {} to {}", filePath, tmpFilePath);
 			}
 
-			log.info("Begin to read Excel File: {}", filePath);
+			log.info("Begin to read Excel File: {}", tmpFilePath);
 			// 2. 开始读入excel文件
-			ReadExcelUtils readUtil = new ReadExcelUtils(filePath);
+			ReadExcelUtils readUtil = new ReadExcelUtils(tmpFilePath);
 			String[] titles = readUtil.readExcelTitle();
 
 			// 3. 查询数据库中是否存在此数据表，如果没有，则标记创建
@@ -186,6 +212,12 @@ public class ExcelDataModule {
 			if (sqls.size() > 0) {
 				excelDataDAO.batchUpdateSql(sqls);
 			}
+			
+			readUtil.close();
+			
+			//删除临时文件
+			FileUtils.deleteDir(tmpFilePath);
+			
 			log.info("Finished to read Excel File: {}", filePath);
 		} catch (Exception ex) {
 			log.error("import excel", ex);

@@ -40,3 +40,6 @@ spring:
 
 excelImport:
   cron: 0 05 7-22 * * ?
+  domain: nventco
+  account: E1121001
+  password: pentair12@
