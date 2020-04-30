@@ -1,8 +1,6 @@
 package com.nvent.qops.module;
 
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -18,11 +16,15 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
 import com.nvent.qops.dao.ExcelDataDAO;
+//import com.nvent.qops.dispatch.module.ExcelWoDoneModule;
 //import com.nvent.qops.eco.module.ExcelEcoModule;
 import com.nvent.qops.entity.ExcelData;
 import com.nvent.util.FileUtils;
+//import com.nvent.qops.plan.module.WoModule;
+//import com.nvent.qops.so.module.ExcelSoDoneModule;
 //import com.nvent.qops.so.module.ExcelSoModule;
 import com.nvent.util.ReadExcelUtils;
 
@@ -33,7 +35,6 @@ import okhttp3.Request;
 import okhttp3.Response;
 
 @Service
-@SuppressWarnings("rawtypes")
 public class ExcelDataModule {
 	public static final Logger log = LoggerFactory.getLogger(ExcelDataModule.class);
 
@@ -42,9 +43,18 @@ public class ExcelDataModule {
 
 //	@Autowired
 //	private ExcelEcoModule excelEcoModule;
-	
+//	
 //	@Autowired
 //	private ExcelSoModule excelSoModule;
+//	
+//	@Autowired
+//	private WoModule woModule;
+//	
+//	@Autowired
+//	private ExcelWoDoneModule woDoneModule;
+//	
+//	@Autowired
+//	private ExcelSoDoneModule soDoneModule;
 	
 	@Value("${qopsURL:http://127.0.0.1:8080}")
 	private String qopsURL;
@@ -101,52 +111,97 @@ public class ExcelDataModule {
 
 		for (ExcelData excel : excels) {
 			//log.info(excel.getNickname());
-			Runnable r = new Runnable() {
+			//1. 导入外部表格数据
+			doExcelImport(excel, auth);
+			String nickName = excel.getNickname();
+			switch (nickName) {
+			case "eco":
+				//2. eco 导入完成后，匹配 ECO_No
+				//excelEcoModule.saveEcoToRfqDetailAndCreatEco();
+				try {
+					OkHttpClient client = new OkHttpClient();
 
-				@Override
-				public void run() {
-					//1. 导入外部表格数据
-					doExcelImport(excel, auth);
-					
-					//2. eco 导入完成后，匹配 ECO_No
-					if(excel.getNickname().equals("eco")) {
-						//excelEcoModule.saveEcoToRfqDetailAndCreatEco();
-						try {
-							OkHttpClient client = new OkHttpClient();
+					Request request = new Request.Builder()
+							.url(qopsURL + "/api/eco/saveEcoToRfqDetailAndCreatEco")
+							.get().addHeader("cache-control", "no-cache").build();
 
-							Request request = new Request.Builder()
-									.url(qopsURL + "/api/eco/saveEcoToRfqDetailAndCreatEco")
-									.get().addHeader("cache-control", "no-cache").build();
-
-							Response response = client.newCall(request).execute();
-						} catch (IOException e) {
-							log.error("saveEcoToRfqDetailAndCreatEco error", e);
-						}
-					}
-					//3. so 导入完成后，匹配 SO_NO
-					if(excel.getNickname().equals("so")) {
-						//excelSoModule.addSoNoToEco();
-						try {
-							OkHttpClient client = new OkHttpClient();
-
-							Request request = new Request.Builder()
-									.url(qopsURL + "/api/so/addSoNoToEco")
-									.get().addHeader("cache-control", "no-cache").build();
-
-							Response response = client.newCall(request).execute();
-						} catch (IOException e) {
-							log.error("saveEcoToRfqDetailAndCreatEco error", e);
-						}
-					}
+					Response response = client.newCall(request).execute();
+				} catch (Exception e) {
+					log.error("saveEcoToRfqDetailAndCreatEco error", e);
 				}
-			};
+				break;
+			case "so":
+				//3. so 导入完成后，匹配 SO_NO
+				//excelSoModule.addSoNoToEco();
+				try {
+					OkHttpClient client = new OkHttpClient();
+
+					Request request = new Request.Builder()
+							.url(qopsURL + "/api/so/addSoNoToEco")
+							.get().addHeader("cache-control", "no-cache").build();
+
+					Response response = client.newCall(request).execute();
+				} catch (Exception e) {
+					log.error("saveEcoToRfqDetailAndCreatEco error", e);
+				}
+				break;
+			case "dispatch":
+				//4. dispatch 导入完成后，创建 WO
+				//woModule.insertDispatchToWo();
+				try {
+					OkHttpClient client = new OkHttpClient();
+
+					Request request = new Request.Builder()
+							.url(qopsURL + "/api/wo/insertDispatchToWo")
+							.get().addHeader("cache-control", "no-cache").build();
+
+					Response response = client.newCall(request).execute();
+				} catch (Exception e) {
+					log.error("saveEcoToRfqDetailAndCreatEco error", e);
+				}
+				break;
+			case "wo_done":
+				//5. wo_done 导入完成后，将 WO 与 dispatch都设成 done
+				//woDoneModule.markWoDone();
+				try {
+					OkHttpClient client = new OkHttpClient();
+
+					Request request = new Request.Builder()
+							.url(qopsURL + "/api/wo/markWoDone")
+							.get().addHeader("cache-control", "no-cache").build();
+
+					Response response = client.newCall(request).execute();
+				} catch (Exception e) {
+					log.error("saveEcoToRfqDetailAndCreatEco error", e);
+				}
+				break;
+			case "so_done":
+				//6. so_done 导入完成后，将 excel_so 都设成 done
+				//soDoneModule.markExcelSoDone();
+				try {
+					OkHttpClient client = new OkHttpClient();
+
+					Request request = new Request.Builder()
+							.url(qopsURL + "/api/so/markExcelSoDone")
+							.get().addHeader("cache-control", "no-cache").build();
+
+					Response response = client.newCall(request).execute();
+				} catch (Exception e) {
+					log.error("saveEcoToRfqDetailAndCreatEco error", e);
+				}
+				break;
+				
+			default:
+				break;
+			}
 			
-			new Thread(r).start();
+			
 		}
 
-		//log.info("End of execute excel import.");
+		log.info("End of execute excel import.");
 	}
 
+	@SuppressWarnings("rawtypes")
 	private void doExcelImport(ExcelData excelData, NtlmPasswordAuthentication auth) {
 		try {
 			// 1. 查找文件是否存在

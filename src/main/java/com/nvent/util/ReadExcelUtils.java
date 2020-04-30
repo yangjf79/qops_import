@@ -19,6 +19,7 @@ import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.web.multipart.MultipartFile;
  
 /**
  * 读取Excel
@@ -30,7 +31,28 @@ public class ReadExcelUtils {
 	private Workbook wb;
 	private Sheet sheet;
 	private Row row;
- 
+	
+	// Ken add -- read excel upload
+	public ReadExcelUtils(MultipartFile file) {
+		
+		String fileName = file.getOriginalFilename();
+		String ext = fileName.substring(fileName.lastIndexOf("."));
+		try {
+			InputStream is = file.getInputStream();//new FileInputStream(file);
+			if(".xls".equals(ext)){
+				wb = new HSSFWorkbook(is);
+			}else if(".xlsx".equals(ext)){
+				wb = new XSSFWorkbook(is);
+			}else{
+				wb=null;
+			}
+		} catch (FileNotFoundException e) {
+			log.error("FileNotFoundException", e);
+		} catch (IOException e) {
+			log.error("IOException", e);
+		}
+	}
+	
 	public ReadExcelUtils(String filepath) {
 		if(filepath==null){
 			return;

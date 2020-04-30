@@ -261,6 +261,50 @@ public class ExcelDataDAO {
 		jdbcTemplate.update(sb.toString());
 	}
 
+	public String updateDataToExcelTableSql(String tableName, String[] titles, Map<Integer,Object> record, List pks) {
+		String sql = null;
+		try {
+			StringBuilder sb = new StringBuilder("UPDATE ");
+			sb.append(tableName).append(" SET ");
+			
+			for (int i = 0; i < titles.length; i ++) {
+				String title = titles[i];
+				if (!pks.contains(title)) {
+					title = title.replace(' ', '_');
+					sb.append('`').append(title).append("`=");
+					
+					String value = record.get(i).toString();
+					value = value.replaceAll("'", "\\\\'");
+					sb.append('\'').append(value).append("',");
+				}
+			}
+			sb.deleteCharAt(sb.length() - 1);
+			sb.append(" WHERE ");
+			
+			for (int i = 0; i < titles.length; i ++) {
+				String title = titles[i];
+				if (pks.contains(title)) {
+					title = title.replace(' ', '_');
+					sb.append('`').append(title).append("`=");
+					
+					String value = record.get(i).toString();
+					value = value.replaceAll("'", "\\\\'");
+					sb.append('\'').append(value).append("' AND ");
+				}
+			}
+			sb.delete(sb.length() - 5, sb.length());
+			sb.append(";");
+			
+			sql = sb.toString();
+			//jdbcTemplate.update(sql);
+			return sql;
+		} catch (Exception ex) {
+			log.error("Error of execute sql: {}", sql);
+			log.error("Error of update data", ex);
+		}
+		return sql;
+	}
+
 	public void dropExcelTable(String tableName) {
 		jdbcTemplate.update("DROP TABLE IF EXISTS `" + tableName + "`;");
 	}
