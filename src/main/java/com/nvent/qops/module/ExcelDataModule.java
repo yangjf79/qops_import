@@ -1,6 +1,7 @@
 package com.nvent.qops.module;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -100,43 +101,50 @@ public class ExcelDataModule {
 
 		for (ExcelData excel : excels) {
 			//log.info(excel.getNickname());
-			//1. 导入外部表格数据
-			doExcelImport(excel, auth);
-			
-			//2. eco 导入完成后，匹配 ECO_No
-			if(excel.getNickname().equals("eco")) {
-				//excelEcoModule.saveEcoToRfqDetailAndCreatEco();
-				try {
-					OkHttpClient client = new OkHttpClient();
+			Runnable r = new Runnable() {
 
-					Request request = new Request.Builder()
-							.url(qopsURL + "/api/eco/saveEcoToRfqDetailAndCreatEco")
-							.get().addHeader("cache-control", "no-cache").build();
+				@Override
+				public void run() {
+					//1. 导入外部表格数据
+					doExcelImport(excel, auth);
+					
+					//2. eco 导入完成后，匹配 ECO_No
+					if(excel.getNickname().equals("eco")) {
+						//excelEcoModule.saveEcoToRfqDetailAndCreatEco();
+						try {
+							OkHttpClient client = new OkHttpClient();
 
-					Response response = client.newCall(request).execute();
-				} catch (IOException e) {
-					log.error("saveEcoToRfqDetailAndCreatEco error", e);
+							Request request = new Request.Builder()
+									.url(qopsURL + "/api/eco/saveEcoToRfqDetailAndCreatEco")
+									.get().addHeader("cache-control", "no-cache").build();
+
+							Response response = client.newCall(request).execute();
+						} catch (IOException e) {
+							log.error("saveEcoToRfqDetailAndCreatEco error", e);
+						}
+					}
+					//3. so 导入完成后，匹配 SO_NO
+					if(excel.getNickname().equals("so")) {
+						//excelSoModule.addSoNoToEco();
+						try {
+							OkHttpClient client = new OkHttpClient();
+
+							Request request = new Request.Builder()
+									.url(qopsURL + "/api/so/addSoNoToEco")
+									.get().addHeader("cache-control", "no-cache").build();
+
+							Response response = client.newCall(request).execute();
+						} catch (IOException e) {
+							log.error("saveEcoToRfqDetailAndCreatEco error", e);
+						}
+					}
 				}
-			}
-			//3. so 导入完成后，匹配 SO_NO
-			if(excel.getNickname().equals("so")) {
-				//excelSoModule.addSoNoToEco();
-				try {
-					OkHttpClient client = new OkHttpClient();
-
-					Request request = new Request.Builder()
-							.url(qopsURL + "/api/so/addSoNoToEco")
-							.get().addHeader("cache-control", "no-cache").build();
-
-					Response response = client.newCall(request).execute();
-				} catch (IOException e) {
-					log.error("saveEcoToRfqDetailAndCreatEco error", e);
-				}
-			}
+			};
 			
+			new Thread(r).start();
 		}
 
-		log.info("End of execute excel import.");
+		//log.info("End of execute excel import.");
 	}
 
 	private void doExcelImport(ExcelData excelData, NtlmPasswordAuthentication auth) {
@@ -145,9 +153,14 @@ public class ExcelDataModule {
 			String tmpFilePath = null;
 			String fileName = excelData.getExcelName();
 			String filePath = excelData.getExcelLocation() + File.separator + fileName;
+			
 			filePath = filePath.replaceAll("\\\\", "/");
-			filePath = "smb:" + filePath;
+			if (!filePath.startsWith("smb:")) {
+				filePath = "smb:" + filePath;
+			}
 			SmbFile file = new SmbFile(filePath, auth);
+			
+			//File file = new File(filePath);
 			if (!file.exists()) {
 				log.error("Didn't find this Excel File: {} - Skipped!", filePath);
 				return;
@@ -155,20 +168,34 @@ public class ExcelDataModule {
 				//文件copy到本地，读取后删除
 				tmpFilePath = tmpPath + "/" + fileName;
 				InputStream is = file.getInputStream();
+				//InputStream is = new FileInputStream(file);
 				FileUtils.transFile(is, tmpFilePath);
 				is.close();
 				log.info("Copied file from {} to {}", filePath, tmpFilePath);
 			}
+			
 
 			log.info("Begin to read Excel File: {}", tmpFilePath);
+			long begin = System.currentTimeMillis();
 			// 2. 开始读入excel文件
 			ReadExcelUtils readUtil = new ReadExcelUtils(tmpFilePath);
 			String[] titles = readUtil.readExcelTitle();
-
+			List<String> titleList = Arrays.asList(titles);
+			List<Map<Integer, Object>> records = readUtil.readExcelContent();
+			log.info("read excel used {}ms.", (System.currentTimeMillis() - begin));
+			
 			// 3. 查询数据库中是否存在此数据表，如果没有，则标记创建
 			String[] pkCols = excelData.getPkCols();
 			String tableName = "excel_" + excelData.getNickname().replace('.', '_').replace(' ', '_');
 			if (!excelDataDAO.checkTableExist(tableName)) {
+				excelDataDAO.createExcelTable(tableName, titles, pkCols);
+			}
+			
+			// 3.1 如果没有updateColumns，则先清空数据，采用删除表，重新创建的方法。
+			String updateColumns = excelData.getUpdateColumns();
+			List<String> updateCols = excelData.getUpdateCols();
+			if (updateColumns == null || updateColumns.length() == 0) {
+				excelDataDAO.dropExcelTable(tableName);
 				excelDataDAO.createExcelTable(tableName, titles, pkCols);
 			}
 
@@ -187,7 +214,6 @@ public class ExcelDataModule {
 			List<Map<String, Object>> pks = excelDataDAO.getPkValuesOfExcelTable(tableName, pkCols);
 
 			// 5. 读入数据并导入数据库
-			List<Map<Integer, Object>> records = readUtil.readExcelContent();
 			int count = 0;
 			List<String> sqls = new ArrayList<>();
 			for (Map<Integer, Object> record : records) {
@@ -200,7 +226,7 @@ public class ExcelDataModule {
 				if (!pks.contains(pk)) {
 					sqls.add(excelDataDAO.insertDataToExcelTableSql(tableName, titles, record));
 				} else {
-					sqls.add(excelDataDAO.updateDataToExcelTableSql(tableName, titles, record, pkList));
+					sqls.add(excelDataDAO.updateDataToExcelTableSql(tableName, titleList, updateCols, record, pkList));
 				}
 				count ++;
 				if (count % 1000 == 0) {
@@ -212,7 +238,6 @@ public class ExcelDataModule {
 			if (sqls.size() > 0) {
 				excelDataDAO.batchUpdateSql(sqls);
 			}
-			
 			readUtil.close();
 			
 			//删除临时文件

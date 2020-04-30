@@ -151,28 +151,30 @@ public class ExcelDataDAO {
 		return null;
 	}
 
-	public String updateDataToExcelTableSql(String tableName, String[] titles, Map<Integer,Object> record, List pks) {
+	public String updateDataToExcelTableSql(String tableName, List<String> titles, List<String> updateCols, Map<Integer,Object> record, List pks) {
 		String sql = null;
 		try {
 			StringBuilder sb = new StringBuilder("UPDATE ");
 			sb.append(tableName).append(" SET ");
 			
-			for (int i = 0; i < titles.length; i ++) {
-				String title = titles[i];
-				if (!pks.contains(title)) {
-					title = title.replace(' ', '_');
-					sb.append('`').append(title).append("`=");
+			int size = updateCols.size();
+			for (int i = 0; i < size; i ++) {
+				String title = updateCols.get(i);
+				int index = titles.indexOf(title);
+
+				title = title.replace(' ', '_');
+				sb.append('`').append(title).append("`=");
 					
-					String value = record.get(i).toString();
-					value = value.replaceAll("'", "\\\\'");
-					sb.append('\'').append(value).append("',");
-				}
+				String value = record.get(index).toString();
+				value = value.replaceAll("'", "\\\\'");
+				sb.append('\'').append(value).append("',");
 			}
 			sb.deleteCharAt(sb.length() - 1);
 			sb.append(" WHERE ");
 			
-			for (int i = 0; i < titles.length; i ++) {
-				String title = titles[i];
+			size = titles.size();
+			for (int i = 0; i < size; i ++) {
+				String title = titles.get(i);
 				if (pks.contains(title)) {
 					title = title.replace(' ', '_');
 					sb.append('`').append(title).append("`=");
@@ -257,5 +259,9 @@ public class ExcelDataDAO {
 		sb.deleteCharAt(sb.length() - 1);
 		sb.append(");");
 		jdbcTemplate.update(sb.toString());
+	}
+
+	public void dropExcelTable(String tableName) {
+		jdbcTemplate.update("DROP TABLE IF EXISTS `" + tableName + "`;");
 	}
 }

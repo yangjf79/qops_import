@@ -1,5 +1,8 @@
 package com.nvent.qops.entity;
 
+import java.util.Arrays;
+import java.util.List;
+
 /*
  * 1，根据 nickname确定需要导入那个excel文件
  * 2，excelLocation + excelName 拼接找到 Excel文件
@@ -15,8 +18,10 @@ public class ExcelData {
 	private String excelName;
 	private String sheetName;
 	private String pkColumns;
+	private String updateColumns;
 	
 	private String[] pkCols;
+	private List<String> updateCols;
 
 	public String getPkColumns() {
 		return pkColumns;
@@ -75,6 +80,26 @@ public class ExcelData {
 
 	public void setPkCols(String[] pkCols) {
 		this.pkCols = pkCols;
+	}
+
+	public String getUpdateColumns() {
+		return updateColumns;
+	}
+
+	public void setUpdateColumns(String updateColumns) {
+		this.updateColumns = updateColumns;
+		if (updateColumns != null && updateColumns.length() > 0) {
+			String[] cols = updateColumns.split(",");
+			this.updateCols = Arrays.asList(cols);
+		}
+	}
+
+	public List<String> getUpdateCols() {
+		return updateCols;
+	}
+
+	public void setUpdateCols(List<String> updateCols) {
+		this.updateCols = updateCols;
 	}
 
 }

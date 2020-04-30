@@ -38,6 +38,8 @@ spring:
   jackson:
     default-property-inclusion: non_null
 
+qopsURL: http://127.0.0.1:8080
+
 excelImport:
   cron: 0 05 7-22 * * ?
   domain: nventco
