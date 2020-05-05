@@ -87,13 +87,17 @@ public class ExcelDataDAO {
 				title = title.replace(' ', '_');
 				sb.append('`').append(title).append("` varchar(255) NOT NULL,");
 			}
+			if (pkCols != null && pkCols.length > 0) {
 			sb.append("PRIMARY KEY (");
-			for (String pkCol : pkCols) {
-				pkCol = pkCol.replace(' ', '_');
-				sb.append('`').append(pkCol).append("`,");
+				for (String pkCol : pkCols) {
+					pkCol = pkCol.replace(' ', '_');
+					sb.append('`').append(pkCol).append("`,");
+				}
+				sb.deleteCharAt(sb.length() - 1);
+				sb.append(")");
+			} else {
+				sb.deleteCharAt(sb.length() - 1);
 			}
-			sb.deleteCharAt(sb.length() - 1);
-			sb.append(")");
 			sb.append(") ENGINE=InnoDB DEFAULT CHARSET=utf8;");
 			
 			sql = sb.toString();

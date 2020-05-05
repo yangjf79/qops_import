@@ -1,6 +1,7 @@
 package com.nvent.qops.module;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -16,7 +17,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
-import org.springframework.web.multipart.MultipartFile;
 
 import com.nvent.qops.dao.ExcelDataDAO;
 //import com.nvent.qops.dispatch.module.ExcelWoDoneModule;
@@ -215,7 +215,7 @@ public class ExcelDataModule {
 			}
 			SmbFile file = new SmbFile(filePath, auth);
 			
-			//File file = new File(filePath);
+//			File file = new File(filePath);
 			if (!file.exists()) {
 				log.error("Didn't find this Excel File: {} - Skipped!", filePath);
 				return;
@@ -223,7 +223,7 @@ public class ExcelDataModule {
 				//文件copy到本地，读取后删除
 				tmpFilePath = tmpPath + "/" + fileName;
 				InputStream is = file.getInputStream();
-				//InputStream is = new FileInputStream(file);
+//				InputStream is = new FileInputStream(file);
 				FileUtils.transFile(is, tmpFilePath);
 				is.close();
 				log.info("Copied file from {} to {}", filePath, tmpFilePath);
@@ -255,33 +255,43 @@ public class ExcelDataModule {
 			}
 
 			// 4. 查询出当前数据表中的主键数据
-			List pkList = Arrays.asList(pkCols);
-			Integer[] pkIndex = new Integer[pkCols.length];
-			for (int i = 0; i < pkCols.length; i++) {
-				String pkTitle = pkCols[i];
-				for (int j = 0; j < titles.length; j++) {
-					if (pkTitle.equals(titles[j])) {
-						pkIndex[i] = j;
-						break;
+			List pkList = null;
+			Integer[] pkIndex = null;
+			List<Map<String, Object>> pks = null;
+			if (pkCols != null && pkCols.length > 0) {
+				pkList = Arrays.asList(pkCols);
+				pkIndex = new Integer[pkCols.length];
+				for (int i = 0; i < pkCols.length; i++) {
+					String pkTitle = pkCols[i];
+					for (int j = 0; j < titles.length; j++) {
+						if (pkTitle.equals(titles[j])) {
+							pkIndex[i] = j;
+							break;
+						}
 					}
 				}
+				pks = excelDataDAO.getPkValuesOfExcelTable(tableName, pkCols);
 			}
-			List<Map<String, Object>> pks = excelDataDAO.getPkValuesOfExcelTable(tableName, pkCols);
 
 			// 5. 读入数据并导入数据库
 			int count = 0;
 			List<String> sqls = new ArrayList<>();
 			for (Map<Integer, Object> record : records) {
-				Map<String, Object> pk = new HashMap<>();
-				for (int i = 0; i < pkCols.length; i++) {
-					pk.put(pkCols[i], record.get(pkIndex[i]));
-				}
+				if (pkCols != null && pkCols.length > 0) {
+					Map<String, Object> pk = new HashMap<>();
+					for (int i = 0; i < pkCols.length; i++) {
+						pk.put(pkCols[i], record.get(pkIndex[i]));
+					}
 
-				// 通过主键字段判断数据是否已存在，如果不存在就做导入，如果存在就进行更新操作
-				if (!pks.contains(pk)) {
-					sqls.add(excelDataDAO.insertDataToExcelTableSql(tableName, titles, record));
+					// 通过主键字段判断数据是否已存在，如果不存在就做导入，如果存在就进行更新操作
+					if (!pks.contains(pk)) {
+						sqls.add(excelDataDAO.insertDataToExcelTableSql(tableName, titles, record));
+					} else {
+						sqls.add(excelDataDAO.updateDataToExcelTableSql(tableName, titleList, updateCols, record, pkList));
+					}
 				} else {
-					sqls.add(excelDataDAO.updateDataToExcelTableSql(tableName, titleList, updateCols, record, pkList));
+					//表中没有pk设定的情况，直接插入。
+					sqls.add(excelDataDAO.insertDataToExcelTableSql(tableName, titles, record));
 				}
 				count ++;
 				if (count % 1000 == 0) {
