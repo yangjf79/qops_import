@@ -4,6 +4,8 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.math.BigDecimal;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
@@ -143,28 +145,20 @@ public class ReadExcelUtils {
 			// 判断当前Cell的Type
 			switch (cell.getCellType()) {
 			case NUMERIC:// 如果当前Cell的Type为NUMERIC
-				cellvalue = cell.getNumericCellValue();
-				break;
+	            if (DateUtil.isCellDateFormatted(cell)) {
+	                try {
+	                    cellvalue = FormatUtil.getDateFormat().format(cell.getDateCellValue());// 日期
+	                } catch (Exception e) {
+	                }
+	            }  else {
+	                BigDecimal bd = new BigDecimal(cell.getNumericCellValue()); 
+	                cellvalue = bd.toPlainString();// 数值 这种用BigDecimal包装再获取plainString，可以防止获取到科学计数值
+	            }
+	            break;
 			case FORMULA: {
 				// 判断当前的cell是否为Date
 				cellvalue = cell.getStringCellValue();
 				
-				try {
-					if (cellvalue != null && ((String) cellvalue).length() > 0 && DateUtil.isCellDateFormatted(cell)) {
-						// 如果是Date类型则，转化为Data格式
-						// data格式是带时分秒的：2013-7-10 0:00:00
-						// cellvalue = cell.getDateCellValue().toLocaleString();
-						// data格式是不带带时分秒的：2013-7-10
-						Date date = cell.getDateCellValue();
-						cellvalue = date;
-					} else {// 如果是纯数字
-
-						// 取得当前Cell的数值
-						cellvalue = String.valueOf(cell.getNumericCellValue());
-					}
-				} catch (Exception ex) {
-					
-				}
 				break;
 			}
 			case STRING:// 如果当前Cell的Type为STRING
@@ -172,7 +166,7 @@ public class ReadExcelUtils {
 				cellvalue = cell.getRichStringCellValue().getString();
 				break;
 			default:// 默认的Cell值
-				cellvalue = "";
+				cellvalue = cell.getStringCellValue();
 			}
 		} else {
 			cellvalue = "";
@@ -187,4 +181,5 @@ public class ReadExcelUtils {
 			log.error("close excel error", e);
 		}
 	}
+
 }

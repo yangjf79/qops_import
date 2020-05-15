@@ -10,6 +10,7 @@ import org.springframework.jdbc.core.BeanPropertyRowMapper;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
+import com.nvent.qops.eco.dao.ExcelEcoDao;
 import com.nvent.qops.entity.ExcelData;
 
 @Service
@@ -19,6 +20,9 @@ public class ExcelDataDAO {
 	
 	@Autowired
 	private JdbcTemplate jdbcTemplate;
+	
+	@Autowired
+	private ExcelEcoDao excelEcoDao;
 	
 	private BeanPropertyRowMapper<ExcelData> excelDataRowMapper = new BeanPropertyRowMapper<ExcelData>(ExcelData.class);
 
@@ -156,7 +160,44 @@ public class ExcelDataDAO {
 	}
 
 	public String updateDataToExcelTableSql(String tableName, List<String> titles, List<String> updateCols, Map<Integer,Object> record, List pks) {
+		
 		String sql = null;
+		
+		//----------------------------
+		switch (tableName) {
+		case "excel_eco":
+			StringBuilder ck = new StringBuilder("SELECT fin_submit FROM ");
+			ck.append(tableName).append(" WHERE ");
+			int size = titles.size();
+			for (int i = 0; i < size; i ++) {
+				String title = titles.get(i);
+				if (pks.contains(title)) {
+					title = title.replace(' ', '_');
+					ck.append('`').append(title).append("`=");
+					
+					String value = record.get(i).toString();
+					value = value.replaceAll("'", "\\\\'");
+					ck.append('\'').append(value).append("' AND ");
+				}
+			}
+			ck.delete(ck.length() - 5, ck.length());
+			ck.append(";");
+			sql = ck.toString();
+			
+			boolean result = excelEcoDao.checkFinSubmitTrue(sql);
+			if (result) {
+				//log.info("Check sql = " + sql);
+				return null;
+			} else {
+				sql = null;
+			}
+			break;
+
+		default:
+			break;
+		}
+		//----------------------------
+		
 		try {
 			StringBuilder sb = new StringBuilder("UPDATE ");
 			sb.append(tableName).append(" SET ");
