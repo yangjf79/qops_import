@@ -166,7 +166,7 @@ public class ReadExcelUtils {
 				cellvalue = cell.getRichStringCellValue().getString();
 				break;
 			default:// 默认的Cell值
-				cellvalue = cell.getStringCellValue();
+				cellvalue = "";
 			}
 		} else {
 			cellvalue = "";
